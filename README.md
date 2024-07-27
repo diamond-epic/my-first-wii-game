@@ -1,3 +1,5 @@
+[Click here to skip straight to Building](https://github.com/diamond-epic/my-first-wii-game/tree/main?tab=readme-ov-file#building)
+
 # My First Wii Game!!!
 Recently, I've been into modding my video game consoles. First I modded my **3DS**, then my **DSi**, and then my **Wii!** Of course, I had fun playing the cool homebrew games, but I also wanted to make some of my own!
 
