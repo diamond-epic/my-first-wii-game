@@ -1,3 +1,4 @@
+[Click here to skip straight to playing the game](https://github.com/diamond-epic/my-first-wii-game/blob/main/README.md#i-wanna-play)
 [Click here to skip straight to Building](https://github.com/diamond-epic/my-first-wii-game/tree/main?tab=readme-ov-file#building)
 
 # My First Wii Game!!!
