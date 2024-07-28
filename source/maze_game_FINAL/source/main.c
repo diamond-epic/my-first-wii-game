@@ -128,6 +128,8 @@ int main(int argc, char **argv) {
 	int rumblethreshold = 5;
 	int rumbleclock = rumblethreshold;
 
+	float timer = 0;
+
     float rad(float deg) {
         return deg * 0.01745329;
     }
@@ -157,13 +159,16 @@ int main(int argc, char **argv) {
 		WPAD_Expansion(0,&othercontroller); // check if there's a controller connected to the wiimote
 		WPAD_IR(0, &irsensor); // check the ir sensor
 
+		bool quit_button = (gamestate == GAMESTATES_MENU) && GRRLIB_PtInRect(273, 371, 93, 57, irsensor.x, irsensor.y);
+
 		if (gamestate == GAMESTATES_MENU) {
 			bool play_button = GRRLIB_PtInRect(156, 191, 303, 118, irsensor.x, irsensor.y);
 			bool controls_button = GRRLIB_PtInRect(29, 360, 181, 75, irsensor.x, irsensor.y);
 			bool credits_button = GRRLIB_PtInRect(440, 367, 171, 71, irsensor.x, irsensor.y);
 			if (play_button ||
 			controls_button ||
-			credits_button) {
+			credits_button ||
+			quit_button) {
 				rumble(5);
 				if (adown()) {
 					if (play_button) gamestate = GAMESTATES_GAME;
@@ -240,6 +245,8 @@ int main(int argc, char **argv) {
 			GRRLIB_Printf(100, 100, tex_BMfont5, GRRLIB_TEAL, 1, "ANG0: %f MAG0: %f", ang0, mag0);
 			GRRLIB_Printf(100, 125, tex_BMfont5, GRRLIB_TEAL, 1, "ANG1: %f MAG1: %f", ang1, mag1);
 			GRRLIB_Printf(100, 150, tex_BMfont5, GRRLIB_TEAL, 1, "joyX: %f joyY: %f", joyx, joyy);
+			GRRLIB_Printf(100, 175, tex_BMfont5, GRRLIB_TEAL, 1, "time: %f", timer);
+			GRRLIB_Printf(100, 200, tex_BMfont5, GRRLIB_TEAL, 1, "time: %f", gettick());
 			GRRLIB_Rectangle(x,y,10,10,GRRLIB_CYAN,1);
 		}
 		if (gamestate == GAMESTATES_WIN) {
@@ -367,8 +374,11 @@ int main(int argc, char **argv) {
 			if (song == 2) PlayOgg(amazonianDyslexia_ogg, amazonianDyslexia_ogg_size, 0, OGG_INFINITE_TIME);
 		}
 
+		timer += 1.0f/60.0f;
+
         // If [HOME] was pressed on the first Wiimote, break out of the loop
-        if ((homedown()) && ((gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_CONTROLS) | (gamestate == GAMESTATES_CREDITS))) break;
+        if (((homedown()) && ((gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_CONTROLS) | (gamestate == GAMESTATES_CREDITS))) ||
+		((adown()) && (quit_button))) break;
 		if ((homedown()) && (gamestate == GAMESTATES_GAME)) gamestate = GAMESTATES_MENU;
         GRRLIB_Render();  // Render the frame buffer to the TV
     }
