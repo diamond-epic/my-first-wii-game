@@ -29,6 +29,8 @@
 #include "wiimote_controls_png.h"
 #include "nunchuck_controls_png.h"
 #include "classic_controller_controls_png.h"
+#include "win_png.h"
+#include "lose_png.h"
 
 #define rightheld() (WPAD_ButtonsHeld(0) & WPAD_BUTTON_RIGHT)
 #define leftheld() (WPAD_ButtonsHeld(0) & WPAD_BUTTON_LEFT)
@@ -44,6 +46,8 @@
 #define homedown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_HOME) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_HOME)
 #define adown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_A) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_A)
 #define bdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_B) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_B)
+#define onedown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_1)
+#define twodown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_2)
 
 #define GRRLIB_BLACK   0x000000FF
 #define GRRLIB_MAROON  0x800000FF
@@ -83,12 +87,16 @@ int main(int argc, char **argv) {
     //GRRLIB_ttfFont *font3 = GRRLIB_LoadTTF(font3_ttf, font3_ttf_size);
     GRRLIB_texImg *tex_BMfont5 = GRRLIB_LoadTexture(BMfont5_png);
     GRRLIB_InitTileSet(tex_BMfont5, 8, 16, 0);
-	GRRLIB_textImg *menu = GRRLIB_LoadTexture(menu_png);
-	GRRLIB_textImg *controls = GRRLIB_LoadTexture(controls_png);
-	GRRLIB_textImg *credits = GRRLIB_LoadTexture(credits_png);
-	GRRLIB_textImg *wiimote_controls = GRRLIB_LoadTexture(wiimote_controls_png);
-	GRRLIB_textImg *nunchuck_controls = GRRLIB_LoadTexture(nunchuck_controls_png);
-	GRRLIB_textImg *classic_controller_controls = GRRLIB_LoadTexture(classic_controller_controls_png);
+	GRRLIB_texImg *menu = GRRLIB_LoadTexture(menu_png);
+	GRRLIB_texImg *controls = GRRLIB_LoadTexture(controls_png);
+	GRRLIB_texImg *credits = GRRLIB_LoadTexture(credits_png);
+	// note to self: MAKE SURE ALL DIMENSIONS ARE DIVISIBLE BY 4
+	GRRLIB_texImg *wiimote_controls = GRRLIB_LoadTexture(wiimote_controls_png);
+	GRRLIB_texImg *nunchuck_controls = GRRLIB_LoadTexture(nunchuck_controls_png);
+	GRRLIB_texImg *classic_controller_controls = GRRLIB_LoadTexture(classic_controller_controls_png);
+	GRRLIB_texImg *maze = GRRLIB_LoadTexture(maze_png);
+	GRRLIB_texImg *win = GRRLIB_LoadTexture(win_png);
+	GRRLIB_texImg *lose = GRRLIB_LoadTexture(lose_png);
 
     float x = 5;
     float y = 5;
@@ -111,6 +119,12 @@ int main(int argc, char **argv) {
 	const int GAMESTATES_LOSE = 5;
 	int gamestate = GAMESTATES_MENU;
 	
+	// control menus
+	const int CONTROLS_WIIMOTE = 0;
+	const int CONTROLS_NUNCHUCK = 1;
+	const int CONTROLS_CLASSIC_CONTROLLER = 2;
+	int control_menu = CONTROLS_WIIMOTE;
+
 	int rumblethreshold = 5;
 	int rumbleclock = rumblethreshold;
 
@@ -118,7 +132,7 @@ int main(int argc, char **argv) {
         return deg * 0.01745329;
     }
 
-	void rumble(threshold) {
+	void rumble(int threshold) {
 		hover1 = true;
 			if (hover0 != hover1) {
 				rumblethreshold = threshold;
@@ -143,11 +157,107 @@ int main(int argc, char **argv) {
 		WPAD_Expansion(0,&othercontroller); // check if there's a controller connected to the wiimote
 		WPAD_IR(0, &irsensor); // check the ir sensor
 
-		switch (gamestate) {
+		if (gamestate == GAMESTATES_MENU) {
+			bool play_button = GRRLIB_PtInRect(156, 191, 303, 118, irsensor.x, irsensor.y);
+			bool controls_button = GRRLIB_PtInRect(29, 360, 181, 75, irsensor.x, irsensor.y);
+			bool credits_button = GRRLIB_PtInRect(440, 367, 171, 71, irsensor.x, irsensor.y);
+			if (play_button ||
+			controls_button ||
+			credits_button) {
+				rumble(5);
+				if (adown()) {
+					if (play_button) gamestate = GAMESTATES_GAME;
+					if (controls_button) gamestate = GAMESTATES_CONTROLS;
+					if (credits_button) gamestate = GAMESTATES_CREDITS;
+				}
+			}
+			else {
+				unrumble();
+			}
+			GRRLIB_DrawImg(0,0,menu,0,1,1,GRRLIB_WHITE);
+			GRRLIB_Circle(irsensor.x, irsensor.y, 5, GRRLIB_RED, 1);
+		}
+		if (gamestate == GAMESTATES_CONTROLS) {
+			bool wiimote_button = GRRLIB_PtInRect(5, 418, 173, 58, irsensor.x, irsensor.y);
+			bool nunchuck_button = GRRLIB_PtInRect(181, 418, 173, 58, irsensor.x, irsensor.y);
+			bool classic_controller_button = GRRLIB_PtInRect(357, 417, 278, 59, irsensor.x, irsensor.y);
+			if (bdown()) gamestate = GAMESTATES_MENU;
+			if (wiimote_button || nunchuck_button || classic_controller_button) {
+				rumble(5);
+				if (adown()) {
+					if (wiimote_button) control_menu = CONTROLS_WIIMOTE;
+					if (nunchuck_button) control_menu = CONTROLS_NUNCHUCK;
+					if (classic_controller_button) control_menu = CONTROLS_CLASSIC_CONTROLLER;
+				}
+			}
+			else {
+				unrumble();
+			}
+			GRRLIB_DrawImg(0,0,controls,0,1,1,GRRLIB_WHITE);
+			GRRLIB_DrawImg(41,88,
+			((control_menu == CONTROLS_WIIMOTE) ? wiimote_controls : ((control_menu == CONTROLS_NUNCHUCK) ? nunchuck_controls : ((control_menu == CONTROLS_CLASSIC_CONTROLLER) ? classic_controller_controls : wiimote_controls))),
+			0,1,1,GRRLIB_WHITE);
+			GRRLIB_Circle(irsensor.x, irsensor.y, 5, GRRLIB_RED, 1);
+		}
+		if (gamestate == GAMESTATES_CREDITS) {
+			if (bdown()) gamestate = GAMESTATES_MENU;
+			GRRLIB_DrawImg(0,0,credits,0,1,1,GRRLIB_WHITE);
+		}
+		if (gamestate == GAMESTATES_GAME) {
+			// check if there's a nunchuck or classic controller connected
+			if (othercontroller.type == WPAD_EXP_NUNCHUK) {
+				//ang0 = othercontroller.nunchuk.js.ang;
+				//mag0 = othercontroller.nunchuk.js.mag;
+				// joyx = (othercontroller.nunchuk.js.pos.x / 32.0f / 3.0f) - 4.0f / 3.0f;
+				// joyy = (othercontroller.nunchuk.js.pos.y / 32.0f / 3.0f) - 4.0f / 3.0f;
+				joyx = (othercontroller.nunchuk.js.pos.x / 32.0f - 4.0f) / 3.0f;
+				joyy = (othercontroller.nunchuk.js.pos.y / 32.0f - 4.0f) / 3.0f;
+				//x += sin(rad(ang0)) * mag0;
+				//y -= cos(rad(ang0)) * mag0;
+				x += joyx;
+				y -= joyy;
+			}
+			else {
+				if (othercontroller.type == WPAD_EXP_CLASSIC) {
+					ang0 = othercontroller.classic.ljs.ang;
+					mag0 = othercontroller.classic.ljs.mag;
+					ang1 = othercontroller.classic.rjs.ang;
+					mag1 = othercontroller.classic.rjs.mag;
+					x += sin(rad(ang0)) * mag0;
+					y -= cos(rad(ang0)) * mag0;
+					x += classicrightheld() ? 1 : (classicleftheld() ? -1 : 0);
+					y -= classicupheld() ? 1 : (classicdownheld() ? -1 : 0);
+				}
+			}
+			// this game is meant to be played sideways
+			x += downheld() ? 1 : (upheld() ? -1 : 0);
+			y += leftheld() ? 1 : (rightheld() ? -1 : 0);
+
+			GRRLIB_DrawImg(0, 0, maze, 0, 1, 1, GRRLIB_WHITE);
+			GRRLIB_Printf(100, 25, tex_BMfont5, GRRLIB_GREEN, 1, "x: %f Y: %f", x, y);
+			//GRRLIB_Printf(100, 50, font, GRRLIB_TEAL, 2, " !\"#$&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+			//GRRLIB_PrintfTTF(100, 75, font3, "please just work", 16, GRRLIB_TEAL);
+			GRRLIB_Printf(100, 100, tex_BMfont5, GRRLIB_TEAL, 1, "ANG0: %f MAG0: %f", ang0, mag0);
+			GRRLIB_Printf(100, 125, tex_BMfont5, GRRLIB_TEAL, 1, "ANG1: %f MAG1: %f", ang1, mag1);
+			GRRLIB_Printf(100, 150, tex_BMfont5, GRRLIB_TEAL, 1, "joyX: %f joyY: %f", joyx, joyy);
+			GRRLIB_Rectangle(x,y,10,10,GRRLIB_CYAN,1);
+		}
+		if (gamestate == GAMESTATES_WIN) {
+			if (adown() | onedown()) gamestate = GAMESTATES_GAME;
+			if (bdown() | twodown()) gamestate = GAMESTATES_MENU;
+			GRRLIB_DrawImg(0, 0, win, 0, 1, 1, GRRLIB_WHITE);
+		}
+		if (gamestate == GAMESTATES_LOSE) {
+			if (adown() | onedown()) gamestate = GAMESTATES_GAME;
+			if (bdown() | twodown()) gamestate = GAMESTATES_MENU;
+			GRRLIB_DrawImg(0, 0, lose, 0, 1, 1, GRRLIB_WHITE);
+		}
+
+		/* switch (gamestate) {
 			case GAMESTATES_MENU:
-				static bool play_button = GRRLIB_PtInRect(156, 191, 303, 118, irsensor.sx, irsensor.sy);
-				static bool controls_button = GRRLIB_PtInRect(29, 360, 181, 75, irsensor.sx, irsensor.sy);
-				static bool credits_button = GRRLIB_PtInRect(440, 367, 171, 71, irsensor.sx, irsensor.sy);
+				bool play_button = GRRLIB_PtInRect(156, 191, 303, 118, irsensor.sx, irsensor.sy);
+				bool controls_button = GRRLIB_PtInRect(29, 360, 181, 75, irsensor.sx, irsensor.sy);
+				bool credits_button = GRRLIB_PtInRect(440, 367, 171, 71, irsensor.sx, irsensor.sy);
 				if (play_button ||
 				controls_button ||
 				credits_button) {
@@ -163,13 +273,13 @@ int main(int argc, char **argv) {
 				}
 				GRRLIB_DrawImg(0,0,menu,0,1,1,GRRLIB_WHITE);
 			case GAMESTATES_CONTROLS:
-				static const int CONTROLS_WIIMOTE = 0;
-				static const int CONTROLS_NUNCHUCK = 1;
-				static const int CONTROLS_CLASSIC_CONTROLLER = 2;
-				static control_menu = CONTROLS_WIIMOTE;
-				static bool wiimote_button = GRRLIB_PtInRect(5, 418, 173, 58, irsensor.sx, irsensor.sy);
-				static bool nunchuck_button = GRRLIB_PtInRect(181, 418, 173, 58, irsensor.sx, irsensor.sy);
-				static bool classic_controller_button = GRRLIB_PtInRect(357, 417, 278, 59, irsensor.sx, irsensor.sy);
+				const int CONTROLS_WIIMOTE = 0;
+				const int CONTROLS_NUNCHUCK = 1;
+				const int CONTROLS_CLASSIC_CONTROLLER = 2;
+				int control_menu = CONTROLS_WIIMOTE;
+				bool wiimote_button = GRRLIB_PtInRect(5, 418, 173, 58, irsensor.sx, irsensor.sy);
+				bool nunchuck_button = GRRLIB_PtInRect(181, 418, 173, 58, irsensor.sx, irsensor.sy);
+				bool classic_controller_button = GRRLIB_PtInRect(357, 417, 278, 59, irsensor.sx, irsensor.sy);
 				if (bdown()) gamestate = GAMESTATES_MENU;
 				if (wiimote_button || nunchuck_button || classic_controller_button) {
 					rumble(5);
@@ -184,7 +294,7 @@ int main(int argc, char **argv) {
 				}
 				GRRLIB_DrawImg(0,0,controls,0,1,1,GRRLIB_WHITE);
 				GRRLIB_DrawImg(41,88,
-				((control_menu == CONTROLS_WIIMOTE) ? wiimote_controls : ((control_menu == CONTROLS_NUNCHUCK) ? nunchuck_controls : ((control_menu == CONTROLS_CLASSIC_CONTROLLER) ? classic_controller_controls))),
+				((control_menu == CONTROLS_WIIMOTE) ? wiimote_controls : ((control_menu == CONTROLS_NUNCHUCK) ? nunchuck_controls : ((control_menu == CONTROLS_CLASSIC_CONTROLLER) ? classic_controller_controls : wiimote_controls))),
 				0,1,1,GRRLIB_WHITE);
 			case GAMESTATES_CREDITS:
 				if (bdown()) gamestate = GAMESTATES_MENU;
@@ -194,12 +304,12 @@ int main(int argc, char **argv) {
 				if (othercontroller.type == WPAD_EXP_NUNCHUK) {
 					//ang0 = othercontroller.nunchuk.js.ang;
 					//mag0 = othercontroller.nunchuk.js.mag;
-					joyx = othercontroller.nunchuk.js.pos.x;
-					joyy = othercontroller.nunchuk.js.pos.y;
+					joyx = (othercontroller.nunchuk.js.pos.x / 32.0f / 3.0f) -4.0f / 3.0f;
+					joyy = (othercontroller.nunchuk.js.pos.y / 32.0f / 3.0f) -4.0f / 3.0f;
 					//x += sin(rad(ang0)) * mag0;
 					//y -= cos(rad(ang0)) * mag0;
 					x += joyx;
-					y += joyy;
+					y -= joyy;
 				}
 				else {
 					if (othercontroller.type == WPAD_EXP_CLASSIC) {
@@ -216,11 +326,20 @@ int main(int argc, char **argv) {
 				// this game is meant to be played sideways
 				x += downheld() ? 1 : (upheld() ? -1 : 0);
 				y += leftheld() ? 1 : (rightheld() ? -1 : 0);
+
+				GRRLIB_DrawImg(0, 0, maze, 0, 1, 1, GRRLIB_WHITE);
+				GRRLIB_Printf(100, 25, tex_BMfont5, GRRLIB_GREEN, 1, "x: %f Y: %f", x, y);
+				//GRRLIB_Printf(100, 50, font, GRRLIB_TEAL, 2, " !\"#$&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+				//GRRLIB_PrintfTTF(100, 75, font3, "please just work", 16, GRRLIB_TEAL);
+				GRRLIB_Printf(100, 100, tex_BMfont5, GRRLIB_TEAL, 1, "ANG0: %f MAG0: %f", ang0, mag0);
+				GRRLIB_Printf(100, 125, tex_BMfont5, GRRLIB_TEAL, 1, "ANG1: %f MAG1: %f", ang1, mag1);
+				GRRLIB_Printf(100, 150, tex_BMfont5, GRRLIB_TEAL, 1, "joyX: %f joyY: %f", joyx, joyy);
+				GRRLIB_Rectangle(x,y,10,10,GRRLIB_CYAN,1);
 			case GAMESTATES_WIN:
 
 			case GAMESTATES_LOSE:
 
-		}
+		} */
         
 		if (rumbleclock < rumblethreshold) {
 			WPAD_Rumble(0, 1);
@@ -241,7 +360,7 @@ int main(int argc, char **argv) {
 
 		if (minusdown()) {
 			song--;
-			if (song > 2) song = 0;
+			if (song < 0) song = 2;
 			StopOgg();
 			if (song == 0) PlayOgg(anxiety_ogg, anxiety_ogg_size, 0, OGG_INFINITE_TIME);
 			if (song == 1) PlayOgg(jazzgrade_ogg, jazzgrade_ogg_size, 0, OGG_INFINITE_TIME);
@@ -249,23 +368,23 @@ int main(int argc, char **argv) {
 		}
 
         // If [HOME] was pressed on the first Wiimote, break out of the loop
-        if (homedown() & ((gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_MENU))) break;
-
-        GRRLIB_FillScreen(GRRLIB_BLACK);    // Clear the screen
-        GRRLIB_Printf(100, 25, tex_BMfont5, GRRLIB_GREEN, 1, "x: %f Y: %f", x, y);
-        //GRRLIB_Printf(100, 50, font, GRRLIB_TEAL, 2, " !\"#$&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
-        //GRRLIB_PrintfTTF(100, 75, font3, "please just work", 16, GRRLIB_TEAL);
-        GRRLIB_Printf(100, 100, tex_BMfont5, GRRLIB_TEAL, 1, "ANG0: %f MAG0: %f", ang0, mag0);
-        GRRLIB_Printf(100, 125, tex_BMfont5, GRRLIB_TEAL, 1, "ANG1: %f MAG1: %f", ang1, mag1);
-		GRRLIB_Printf(100, 150, tex_BMfont5, GRRLIB_TEAL, 1, "joyX: %f joyY: %f", joyx, joyy);
-        GRRLIB_Rectangle(x,y,10,10,GRRLIB_CYAN,1);
-
+        if ((homedown()) && ((gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_CONTROLS) | (gamestate == GAMESTATES_CREDITS))) break;
+		if ((homedown()) && (gamestate == GAMESTATES_GAME)) gamestate = GAMESTATES_MENU;
         GRRLIB_Render();  // Render the frame buffer to the TV
     }
     //GRRLIB_FreeTexture(font);
-    GRRLIB_FreeTexture(font2);
+    //GRRLIB_FreeTexture(font2);
     //GRRLIB_FreeTTF(font3);
     GRRLIB_FreeTexture(tex_BMfont5);
+	GRRLIB_FreeTexture(menu);
+	GRRLIB_FreeTexture(controls);
+	GRRLIB_FreeTexture(credits);
+	GRRLIB_FreeTexture(wiimote_controls);
+	GRRLIB_FreeTexture(nunchuck_controls);
+	GRRLIB_FreeTexture(classic_controller_controls);
+	GRRLIB_FreeTexture(maze);
+	GRRLIB_FreeTexture(win);
+	GRRLIB_FreeTexture(lose);
     GRRLIB_Exit(); // Be a good boy, clear the memory allocated by GRRLIB
 
 	StopOgg();
