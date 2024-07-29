@@ -32,34 +32,42 @@
 #include "win_png.h"
 #include "lose_png.h"
 
+struct expansion_t othercontroller; //nunchuk or classic controller
+struct ir_t irsensor;
+
 #define rightheld() (WPAD_ButtonsHeld(0) & WPAD_BUTTON_RIGHT)
 #define leftheld() (WPAD_ButtonsHeld(0) & WPAD_BUTTON_LEFT)
 #define upheld() (WPAD_ButtonsHeld(0) & WPAD_BUTTON_UP)
 #define downheld() (WPAD_ButtonsHeld(0) & WPAD_BUTTON_DOWN)
-#define classicrightheld() (WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_RIGHT)
-#define classicleftheld() (WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_LEFT)
-#define classicupheld() (WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_UP)
-#define classicdownheld() (WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_DOWN)
+#define classicrightheld() ((WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_RIGHT) && (othercontroller.type == WPAD_EXP_CLASSIC))
+#define classicleftheld() ((WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_LEFT) && (othercontroller.type == WPAD_EXP_CLASSIC))
+#define classicupheld() ((WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_UP) && (othercontroller.type == WPAD_EXP_CLASSIC))
+#define classicdownheld() ((WPAD_ButtonsHeld(0) & WPAD_CLASSIC_BUTTON_DOWN) && (othercontroller.type == WPAD_EXP_CLASSIC))
 
 #define rightdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_RIGHT)
 #define leftdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_LEFT)
 #define updown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_UP)
 #define downdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_DOWN)
-#define classicrightdown() (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_RIGHT)
-#define classicleftdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_LEFT) && !(WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C))
-#define classicupdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_UP) && !(WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_Z))
-#define classicdowndown() (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_DOWN)
+#define classicrightdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_RIGHT) && (othercontroller.type == WPAD_EXP_CLASSIC))
+// #define classicleftdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_LEFT) && !(WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C))
+// #define classicupdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_UP) && !(WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_Z))
+#define classicleftdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_LEFT) && (othercontroller.type == WPAD_EXP_CLASSIC))
+#define classicupdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_UP) && (othercontroller.type == WPAD_EXP_CLASSIC))
+#define classicdowndown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_DOWN) && (othercontroller.type == WPAD_EXP_CLASSIC))
 
-#define plusdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_PLUS) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_PLUS)
-#define minusdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_MINUS) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_MINUS)
-#define homedown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_HOME) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_HOME)
-#define classicadown() (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_A)
+#define plusdown() ((WPAD_ButtonsDown(0) & WPAD_BUTTON_PLUS) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_PLUS) && (othercontroller.type == WPAD_EXP_CLASSIC)))
+#define minusdown() ((WPAD_ButtonsDown(0) & WPAD_BUTTON_MINUS) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_MINUS) && (othercontroller.type == WPAD_EXP_CLASSIC)))
+
+#define homedown() ((WPAD_ButtonsDown(0) & WPAD_BUTTON_HOME) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_HOME) && (othercontroller.type == WPAD_EXP_CLASSIC)))
+
+#define classicadown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_A) && (othercontroller.type == WPAD_EXP_CLASSIC))
 #define adown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_A)
-#define bdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_B) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_B)
+#define bdown() ((WPAD_ButtonsDown(0) & WPAD_BUTTON_B) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_B) && (othercontroller.type == WPAD_EXP_CLASSIC)))
 #define onedown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_1)
 #define twodown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_2)
 
-#define toggledebug() ((WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X)) && !classicleftdown()
+// #define toggledebug() ((WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X)) && !classicleftdown()
+#define toggledebug() (((WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) && (othercontroller.type == WPAD_EXP_NUNCHUK)) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X) && (othercontroller.type == WPAD_EXP_CLASSIC)))
 
 #define GRRLIB_BLACK   0x000000FF
 #define GRRLIB_MAROON  0x800000FF
@@ -184,9 +192,6 @@ int main(int argc, char **argv) {
 		gamestate = GAMESTATES_MENU;
 	}
 
-	struct expansion_t othercontroller; //nunchuk or classic controller
-	struct ir_t irsensor;
-
 	PlayOgg(anxiety_ogg, anxiety_ogg_size, 0, OGG_INFINITE_TIME);
 
     // Loop forever
@@ -225,7 +230,7 @@ int main(int argc, char **argv) {
 			rightdown() ||
 			downdown() ||
 			leftdown()) {
-				rumble(2);
+				rumble(3);
 				unrumble();
 			}
 
@@ -293,7 +298,7 @@ int main(int argc, char **argv) {
 			rightdown() ||
 			downdown() ||
 			leftdown()) {
-				rumble(5);
+				rumble(3);
 				unrumble();
 			}
 
@@ -549,7 +554,7 @@ int main(int argc, char **argv) {
         // If [HOME] was pressed on the first Wiimote, break out of the loop
         if (((homedown()) && ((gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_CONTROLS) | (gamestate == GAMESTATES_CREDITS))) ||
 		(adown() && quit_button) ||
-		(onedown() && (selected_button == SELECT_QUIT))) break;
+		((onedown() || classicadown()) && (selected_button == SELECT_QUIT))) break;
 		if ((homedown()) && (gamestate == GAMESTATES_GAME)) {
 			selected_button = SELECT_PLAY;
 			gamestate = GAMESTATES_MENU;
