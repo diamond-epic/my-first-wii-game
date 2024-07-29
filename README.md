@@ -17,6 +17,8 @@ I know that was a lot to read, but I've just been really excited about all of th
 
 7/27/24 (July 27th, 2024) - I struggled on rendering images that didn't have 640x480 dimensions. After around an hour of trial and error, I found that any images with dimensions that are divisible by 4 would render.
 
+7/29/24 (July 29th, 2024) - I found a bug where if you press left on the classic controller D-pad, it presses X on the classic controller or C on the nunchuck, and where if you press C or Z on the nunchuck, it presses left or up on the classic controller D-pad respectively. I believe the problem is that the game should only be accounting for classic controller & nunchuck inputs if they are actually connected to the wiimote, but for now I just hard-coded the solution which should be good enough.
+
 ## i wanna play
 If you have a modded Wii, all you need to do is download "maze game.zip", extract it, and put the "maze game" folder into the apps folder on your SD card or USB stick. I've tested this game on Dolphin, but I am not sure if the audio works with it.
 
