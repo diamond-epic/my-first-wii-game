@@ -46,8 +46,8 @@
 #define updown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_UP)
 #define downdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_DOWN)
 #define classicrightdown() (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_RIGHT)
-#define classicleftdown() (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_LEFT)
-#define classicupdown() (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_UP)
+#define classicleftdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_LEFT) && !(WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C))
+#define classicupdown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_UP) && !(WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_Z))
 #define classicdowndown() (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_DOWN)
 
 #define plusdown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_PLUS) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_PLUS)
@@ -59,7 +59,7 @@
 #define onedown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_1)
 #define twodown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_2)
 
-#define toggledebug() (WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X)
+#define toggledebug() ((WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X)) && !classicleftdown()
 
 #define GRRLIB_BLACK   0x000000FF
 #define GRRLIB_MAROON  0x800000FF
@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
 			rightdown() ||
 			downdown() ||
 			leftdown()) {
-				rumble(5);
+				rumble(2);
 				unrumble();
 			}
 
