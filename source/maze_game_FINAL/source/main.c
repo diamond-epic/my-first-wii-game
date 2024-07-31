@@ -235,7 +235,7 @@ int main(int argc, char **argv) {
 			}
 
 			if (onedown() || classicadown()) {
-				if (selected_button == SELECT_PLAY) gamestate = GAMESTATES_GAME;
+				if (selected_button == SELECT_PLAY) startGame();
 				if (selected_button == SELECT_CONTROLS) {
 					gamestate = GAMESTATES_CONTROLS;
 					selected_button = SELECT_WIIMOTE;
