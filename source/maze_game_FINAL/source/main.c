@@ -8,11 +8,9 @@
 //#include <ogc/lwp_watchdog.h>   // Needed for gettime and ticks_to_millisecs
 #include <asndlib.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <gccore.h>
 #include <math.h>
 #include <wiiuse/wpad.h>
-#include <gcmodplay.h>
+#include <gccore.h> // this is for gamecube controller compatibility
 #include "oggplayer.h"
 
 //#include "font_png.h"
@@ -29,6 +27,7 @@
 #include "wiimote_controls_png.h"
 #include "nunchuck_controls_png.h"
 #include "classic_controller_controls_png.h"
+#include "gamecube_controller_controls_png.h"
 #include "win_png.h"
 #include "lose_png.h"
 
@@ -62,12 +61,26 @@ struct ir_t irsensor;
 
 #define classicadown() ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_A) && (othercontroller.type == WPAD_EXP_CLASSIC))
 #define adown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_A)
-#define bdown() ((WPAD_ButtonsDown(0) & WPAD_BUTTON_B) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_B) && (othercontroller.type == WPAD_EXP_CLASSIC)))
+#define bdown() ((WPAD_ButtonsDown(0) & WPAD_BUTTON_B) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_B) && (othercontroller.type == WPAD_EXP_CLASSIC)) || (PAD_ButtonsDown(0) & PAD_BUTTON_B))
 #define onedown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_1)
 #define twodown() (WPAD_ButtonsDown(0) & WPAD_BUTTON_2)
 
+#define gcupheld() (PAD_ButtonsHeld(0) & PAD_BUTTON_UP)
+#define gcdownheld() (PAD_ButtonsHeld(0) & PAD_BUTTON_DOWN)
+#define gcleftheld() (PAD_ButtonsHeld(0) & PAD_BUTTON_LEFT)
+#define gcrightheld() (PAD_ButtonsHeld(0) & PAD_BUTTON_RIGHT)
+
+#define gcupdown() (PAD_ButtonsDown(0) & PAD_BUTTON_UP)
+#define gcdowndown() (PAD_ButtonsDown(0) & PAD_BUTTON_DOWN)
+#define gcleftdown() (PAD_ButtonsDown(0) & PAD_BUTTON_LEFT)
+#define gcrightdown() (PAD_ButtonsDown(0) & PAD_BUTTON_RIGHT)
+#define gcadown() (PAD_ButtonsDown(0) & PAD_BUTTON_A)
+#define gcleftshoulderdown() (PAD_ButtonsDown(0) & PAD_TRIGGER_L)
+#define gcrightshoulderdown() (PAD_ButtonsDown(0) & PAD_TRIGGER_R)
+#define gcstartdown() (PAD_ButtonsDown(0) & PAD_BUTTON_START)
+
 // #define toggledebug() ((WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) || (WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X)) && !classicleftdown()
-#define toggledebug() (((WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) && (othercontroller.type == WPAD_EXP_NUNCHUK)) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X) && (othercontroller.type == WPAD_EXP_CLASSIC)))
+#define toggledebug() ((WPAD_ButtonsDown(0) & WPAD_NUNCHUK_BUTTON_C) && (othercontroller.type == WPAD_EXP_NUNCHUK)) || ((WPAD_ButtonsDown(0) & WPAD_CLASSIC_BUTTON_X) && (othercontroller.type == WPAD_EXP_CLASSIC)) || (PAD_ButtonsDown(0) & PAD_TRIGGER_Z)
 
 #define GRRLIB_BLACK   0x000000FF
 #define GRRLIB_MAROON  0x800000FF
@@ -98,6 +111,9 @@ int main(int argc, char **argv) {
     WPAD_Init();
     WPAD_SetDataFormat(WPAD_CHAN_0, WPAD_FMT_BTNS_ACC_IR); // allows usage of buttons, accelerometer, and ir sensor (a.k.a the thing that makes your wiimote go pointy point)
 
+	// Initialise the Gamecube Controllers
+	PAD_Init();
+
     // Initialise the audio subsystem
 	ASND_Init();
 
@@ -115,6 +131,7 @@ int main(int argc, char **argv) {
 	GRRLIB_texImg *wiimote_controls = GRRLIB_LoadTexture(wiimote_controls_png);
 	GRRLIB_texImg *nunchuck_controls = GRRLIB_LoadTexture(nunchuck_controls_png);
 	GRRLIB_texImg *classic_controller_controls = GRRLIB_LoadTexture(classic_controller_controls_png);
+	GRRLIB_texImg *gamecube_controller_controls = GRRLIB_LoadTexture(gamecube_controller_controls_png);
 	GRRLIB_texImg *maze = GRRLIB_LoadTexture(maze_png);
 	GRRLIB_texImg *win = GRRLIB_LoadTexture(win_png);
 	GRRLIB_texImg *lose = GRRLIB_LoadTexture(lose_png);
@@ -127,9 +144,15 @@ int main(int argc, char **argv) {
     float mag1 = 0;
 	float joyx = 0;
 	float joyy = 0;
+	float gcx = 0;
+	float gcy = 0;
+	float gccx = 0;
+	float gccy = 0;
 	int song = 0;
 	bool hover0;
 	bool hover1;
+	bool gchover0;
+	bool gchover1;
 
 	// gamestates
 	const int GAMESTATES_MENU = 0;
@@ -148,16 +171,21 @@ int main(int argc, char **argv) {
 	const int SELECT_WIIMOTE = 5;
 	const int SELECT_NUNCHUCK = 6;
 	const int SELECT_CLASSIC_CONTROLLER = 7;
+	const int SELECT_GAMECUBE_CONTROLLER = 8;
 	int selected_button = SELECT_PLAY;
 	
 	// control menus
 	const int CONTROLS_WIIMOTE = 0;
 	const int CONTROLS_NUNCHUCK = 1;
 	const int CONTROLS_CLASSIC_CONTROLLER = 2;
+	const int CONTROLS_GAMECUBE_CONTROLLER = 3;
 	int control_menu = CONTROLS_WIIMOTE;
 
 	int rumblethreshold = 5;
 	int rumbleclock = rumblethreshold;
+
+	int gcrumblethreshold = 5;
+	int gcrumbleclock = gcrumblethreshold;
 
 	float timer = 30;
 
@@ -180,6 +208,19 @@ int main(int argc, char **argv) {
 		hover0 = false;
 	}
 
+	void gcrumble(int threshold) {
+		gchover1 = true;
+			if (gchover0 != gchover1) {
+				gcrumblethreshold = threshold;
+				gcrumbleclock = 0;
+			}
+		gchover0 = true;
+	}
+	void gcunrumble() {
+		gchover1 = false;
+		gchover0 = false;
+	}
+
 	void startGame() {
 		x = 5;
 		y = 5;
@@ -200,6 +241,7 @@ int main(int argc, char **argv) {
 		WPAD_ScanPads();  // Scan the Wiimotes
 		WPAD_Expansion(0,&othercontroller); // check if there's a controller connected to the wiimote
 		WPAD_IR(0, &irsensor); // check the ir sensor
+		PAD_ScanPads(); // Scan the Gamecube Controllers
 
 		const bool quit_button = (gamestate == GAMESTATES_MENU) && GRRLIB_PtInRect(273, 371, 93, 57, irsensor.x, irsensor.y);
 
@@ -234,7 +276,15 @@ int main(int argc, char **argv) {
 				unrumble();
 			}
 
-			if (onedown() || classicadown()) {
+			if (gcupdown() ||
+			gcdowndown() ||
+			gcleftdown() ||
+			gcrightdown()) {
+				gcrumble(7);
+				gcunrumble();
+			}
+
+			if (onedown() || classicadown() || gcadown()) {
 				if (selected_button == SELECT_PLAY) startGame();
 				if (selected_button == SELECT_CONTROLS) {
 					gamestate = GAMESTATES_CONTROLS;
@@ -245,30 +295,30 @@ int main(int argc, char **argv) {
 
 			GRRLIB_DrawImg(0,0,menu,0,1,1,GRRLIB_WHITE);
 			if (selected_button == SELECT_PLAY) {
-				if (classicleftdown() || updown()) selected_button = SELECT_CONTROLS;
-				if (classicdowndown() || leftdown() || classicupdown() || rightdown()) selected_button = SELECT_QUIT;
-				if (classicrightdown() || downdown()) selected_button = SELECT_CREDITS;
+				if (classicleftdown() || gcleftdown() || updown()) selected_button = SELECT_CONTROLS;
+				if (classicdowndown() || gcdowndown() || leftdown() || classicupdown() || gcupdown() || rightdown()) selected_button = SELECT_QUIT;
+				if (classicrightdown() || gcrightdown() || downdown()) selected_button = SELECT_CREDITS;
 				GRRLIB_Rectangle(156, 191, 303, 118, GRRLIB_CYAN_TRANSLUCENT, true);
 			}
 			else {
 				if (selected_button == SELECT_CONTROLS) {
-					if (classicleftdown() || updown()) selected_button = SELECT_CREDITS;
-					if (classicdowndown() || leftdown() || classicupdown() || rightdown()) selected_button = SELECT_PLAY;
-					if (classicrightdown() || downdown()) selected_button = SELECT_QUIT;
+					if (classicleftdown() || gcleftdown() || updown()) selected_button = SELECT_CREDITS;
+					if (classicdowndown() || gcdowndown() || leftdown() || classicupdown() || gcupdown() || rightdown()) selected_button = SELECT_PLAY;
+					if (classicrightdown() || gcrightdown() || downdown()) selected_button = SELECT_QUIT;
 					GRRLIB_Rectangle(28, 360, 181, 75, GRRLIB_CYAN_TRANSLUCENT, true);
 				}
 				else {
 					if (selected_button == SELECT_CREDITS) {
-						if (classicleftdown() || updown()) selected_button = SELECT_QUIT;
-						if (classicdowndown() || leftdown() || classicupdown() || rightdown()) selected_button = SELECT_PLAY;
-						if (classicrightdown() || downdown()) selected_button = SELECT_CONTROLS;
+						if (classicleftdown() || gcleftdown() || updown()) selected_button = SELECT_QUIT;
+						if (classicdowndown() || gcdowndown() || leftdown() || classicupdown() || gcupdown() || rightdown()) selected_button = SELECT_PLAY;
+						if (classicrightdown() || gcrightdown() || downdown()) selected_button = SELECT_CONTROLS;
 						GRRLIB_Rectangle(440, 367, 171, 71, GRRLIB_CYAN_TRANSLUCENT, true);
 					}
 					else {
 						if (selected_button == SELECT_QUIT) {
-							if (classicleftdown() || updown()) selected_button = SELECT_CONTROLS;
-							if (classicdowndown() || leftdown() || classicupdown() || rightdown()) selected_button = SELECT_PLAY;
-							if (classicrightdown() || downdown()) selected_button = SELECT_CREDITS;
+							if (classicleftdown() || gcleftdown() || updown()) selected_button = SELECT_CONTROLS;
+							if (classicdowndown() || gcdowndown() || leftdown() || classicupdown() || gcupdown() || rightdown()) selected_button = SELECT_PLAY;
+							if (classicrightdown() || gcrightdown() || downdown()) selected_button = SELECT_CREDITS;
 							GRRLIB_Rectangle(273, 371, 93, 57, GRRLIB_CYAN_TRANSLUCENT, true);
 						}
 					}
@@ -276,18 +326,20 @@ int main(int argc, char **argv) {
 			}
 		}
 		if (gamestate == GAMESTATES_CONTROLS) {
-			const bool wiimote_button = GRRLIB_PtInRect(5, 418, 173, 58, irsensor.x, irsensor.y);
-			const bool nunchuck_button = GRRLIB_PtInRect(181, 418, 173, 58, irsensor.x, irsensor.y);
-			const bool classic_controller_button = GRRLIB_PtInRect(357, 417, 278, 59, irsensor.x, irsensor.y);
-
+			const bool wiimote_button = GRRLIB_PtInRect(5, 413, 154, 63, irsensor.x, irsensor.y);
+			const bool nunchuck_button = GRRLIB_PtInRect(165, 412, 154, 63, irsensor.x, irsensor.y);
+			const bool classic_controller_button = GRRLIB_PtInRect(324, 412, 154, 63, irsensor.x, irsensor.y);
+			const bool gamecube_controller_button = GRRLIB_PtInRect(482, 412, 154, 63, irsensor.x, irsensor.y);
+			
 			if (bdown() || twodown()) backToMenu();
 			
-			if (wiimote_button || nunchuck_button || classic_controller_button) {
+			if (wiimote_button || nunchuck_button || classic_controller_button || gamecube_controller_button) {
 				rumble(5);
 				if (adown()) {
 					if (wiimote_button) control_menu = CONTROLS_WIIMOTE;
 					if (nunchuck_button) control_menu = CONTROLS_NUNCHUCK;
 					if (classic_controller_button) control_menu = CONTROLS_CLASSIC_CONTROLLER;
+					if (gamecube_controller_button) control_menu = CONTROLS_GAMECUBE_CONTROLLER;
 				}
 			}
 			else {
@@ -302,34 +354,51 @@ int main(int argc, char **argv) {
 				unrumble();
 			}
 
-			if (onedown() || classicadown()) {
+			if (gcupdown() ||
+			gcdowndown() ||
+			gcleftdown() ||
+			gcrightdown()) {
+				gcrumble(7);
+				gcunrumble();
+			}
+
+			if (onedown() || classicadown() || gcadown()) {
 				if (selected_button == SELECT_WIIMOTE) control_menu = CONTROLS_WIIMOTE;
 				if (selected_button == SELECT_NUNCHUCK) control_menu = CONTROLS_NUNCHUCK;
 				if (selected_button == SELECT_CLASSIC_CONTROLLER) control_menu = CONTROLS_CLASSIC_CONTROLLER;
+				if (selected_button == SELECT_GAMECUBE_CONTROLLER) control_menu = CONTROLS_GAMECUBE_CONTROLLER;
 			}
 
 			GRRLIB_DrawImg(0,0,controls,0,1,1,GRRLIB_WHITE);
 			GRRLIB_DrawImg(41,88,
 			((control_menu == CONTROLS_WIIMOTE) ? wiimote_controls :
 			((control_menu == CONTROLS_NUNCHUCK) ? nunchuck_controls :
-			((control_menu == CONTROLS_CLASSIC_CONTROLLER) ? classic_controller_controls : wiimote_controls))),
+			((control_menu == CONTROLS_CLASSIC_CONTROLLER) ? classic_controller_controls :
+			((control_menu == CONTROLS_GAMECUBE_CONTROLLER) ? gamecube_controller_controls : wiimote_controls)))),
 			0,1,1,GRRLIB_WHITE);
 			if (selected_button == SELECT_WIIMOTE) {
-				if (classicleftdown() || leftdown() || updown()) selected_button = SELECT_CLASSIC_CONTROLLER;
-				if (classicrightdown() || rightdown() || downdown()) selected_button = SELECT_NUNCHUCK;
-				GRRLIB_Rectangle(5, 418, 173, 58, GRRLIB_CYAN_TRANSLUCENT, true);
+				if (classicleftdown() || gcleftdown() || leftdown() || updown()) selected_button = SELECT_CLASSIC_CONTROLLER;
+				if (classicrightdown() || gcrightdown() || rightdown() || downdown()) selected_button = SELECT_NUNCHUCK;
+				GRRLIB_Rectangle(5, 413, 154, 63, GRRLIB_CYAN_TRANSLUCENT, true);
 			}
 			else {
 				if (selected_button == SELECT_NUNCHUCK) {
-					if (classicleftdown() || leftdown() || updown()) selected_button = SELECT_WIIMOTE;
-					if (classicrightdown() || rightdown() || downdown()) selected_button = SELECT_CLASSIC_CONTROLLER;
-					GRRLIB_Rectangle(181, 418, 173, 58, GRRLIB_CYAN_TRANSLUCENT, true);
+					if (classicleftdown() || gcleftdown() || leftdown() || updown()) selected_button = SELECT_WIIMOTE;
+					if (classicrightdown() || gcrightdown() || rightdown() || downdown()) selected_button = SELECT_CLASSIC_CONTROLLER;
+					GRRLIB_Rectangle(165, 412, 154, 63, GRRLIB_CYAN_TRANSLUCENT, true);
 				}
 				else {
 					if (selected_button == SELECT_CLASSIC_CONTROLLER) {
-						if (classicleftdown() || leftdown() || updown()) selected_button = SELECT_NUNCHUCK;
-						if (classicrightdown() || rightdown() || downdown()) selected_button = SELECT_WIIMOTE;
-						GRRLIB_Rectangle(357, 417, 278, 59, GRRLIB_CYAN_TRANSLUCENT, true);
+						if (classicleftdown() || gcleftdown() || leftdown() || updown()) selected_button = SELECT_NUNCHUCK;
+						if (classicrightdown() || gcrightdown() || rightdown() || downdown()) selected_button = SELECT_GAMECUBE_CONTROLLER;
+						GRRLIB_Rectangle(324, 412, 154, 63, GRRLIB_CYAN_TRANSLUCENT, true);
+					}
+					else {
+						if (selected_button == SELECT_GAMECUBE_CONTROLLER) {
+							if (classicleftdown() || gcleftdown() || leftdown() || updown()) selected_button = SELECT_CLASSIC_CONTROLLER;
+							if (classicrightdown() || gcrightdown() || rightdown() || downdown()) selected_button = SELECT_WIIMOTE;
+							GRRLIB_Rectangle(482, 412, 154, 63, GRRLIB_CYAN_TRANSLUCENT, true);
+					}
 					}
 				}
 			}
@@ -397,11 +466,22 @@ int main(int argc, char **argv) {
 					y += classicupheld() ? 1 : (classicdownheld() ? -1 : 0);
 				}
 			}
+
+			gcx = PAD_StickX(0);
+			gcy = PAD_StickY(0);
+			gccx = PAD_SubStickX(0);
+			gccy = PAD_SubStickY(0);
+
 			// this game is meant to be played sideways
-			x += downheld() ? 1 : (upheld() ? -1 : 0);
-			if (isTouchingWalls()) x -= downheld() ? 1 : (upheld() ? -1 : 0);
-			y += leftheld() ? 1 : (rightheld() ? -1 : 0);
-			if (isTouchingWalls()) y -= leftheld() ? 1 : (rightheld() ? -1 : 0);
+			x += (downheld() || gcrightheld()) ? 1 : ((upheld() || gcleftheld()) ? -1 : 0);
+			if (isTouchingWalls()) x -= (downheld() || gcrightheld()) ? 1 : ((upheld() || gcleftheld()) ? -1 : 0);
+			y += (leftheld() || gcdownheld()) ? 1 : ((rightheld() || gcupheld()) ? -1 : 0);
+			if (isTouchingWalls()) y -= (leftheld() || gcdownheld()) ? 1 : ((rightheld() || gcupheld()) ? -1 : 0);
+
+			x += gcx / 92.0f;
+			if (isTouchingWalls()) x -= gcx / 92.0f;
+			y -= gcy / 92.0f;
+			if (isTouchingWalls()) y += gcy / 92.0f;
 
 			const bool winning = GRRLIB_RectOnRect(390, 363, 34, 33, x, y, 10, 10);
 			
@@ -419,18 +499,20 @@ int main(int argc, char **argv) {
 				GRRLIB_Printf(100, 100, tex_BMfont5, GRRLIB_TEAL, 1, "ANG0: %f MAG0: %f", ang0, mag0);
 				GRRLIB_Printf(100, 125, tex_BMfont5, GRRLIB_TEAL, 1, "ANG1: %f MAG1: %f", ang1, mag1);
 				GRRLIB_Printf(100, 150, tex_BMfont5, GRRLIB_TEAL, 1, "joyX: %f joyY: %f", joyx, joyy);
+				GRRLIB_Printf(100, 200, tex_BMfont5, GRRLIB_TEAL, 1, "gcjoyX: %f gcjoyY: %f", gcx, gcy);
+				GRRLIB_Printf(100, 225, tex_BMfont5, GRRLIB_TEAL, 1, "gccjoyX: %f gccjoyY: %f", gccx, gccy);
 			}
 			GRRLIB_Printf(100, 175, tex_BMfont5, GRRLIB_TEAL, 1, "time: %f", timer);
 			// GRRLIB_Printf(100, 200, tex_BMfont5, GRRLIB_TEAL, 1, "time: %f", gettick());
 			GRRLIB_Rectangle(x,y,10,10,GRRLIB_CYAN,true);
 		}
 		if (gamestate == GAMESTATES_WIN) {
-			if (adown() | classicadown() | onedown()) startGame();
+			if (adown() | classicadown() | onedown() | gcadown()) startGame();
 			if (bdown() | twodown()) gamestate = GAMESTATES_MENU;
 			GRRLIB_DrawImg(0, 0, win, 0, 1, 1, GRRLIB_WHITE);
 		}
 		if (gamestate == GAMESTATES_LOSE) {
-			if (adown() | classicadown() | onedown()) startGame();
+			if (adown() | classicadown() | onedown() | gcadown()) startGame();
 			if (bdown() | twodown()) gamestate = GAMESTATES_MENU;
 			GRRLIB_DrawImg(0, 0, lose, 0, 1, 1, GRRLIB_WHITE);
 		}
@@ -531,7 +613,15 @@ int main(int argc, char **argv) {
 			WPAD_Rumble(0, 0);
 		}
 
-		if (plusdown()) {
+		if (gcrumbleclock < gcrumblethreshold) {
+			PAD_ControlMotor(0, 1);
+			gcrumbleclock++;
+		}
+		else {
+			PAD_ControlMotor(0, 0);
+		}
+
+		if (plusdown() || gcrightshoulderdown()) {
 			song++;
 			if (song > 2) song = 0;
 			StopOgg();
@@ -540,7 +630,7 @@ int main(int argc, char **argv) {
 			if (song == 2) PlayOgg(amazonianDyslexia_ogg, amazonianDyslexia_ogg_size, 0, OGG_INFINITE_TIME);
 		}
 
-		if (minusdown()) {
+		if (minusdown() || gcleftshoulderdown()) {
 			song--;
 			if (song < 0) song = 2;
 			StopOgg();
@@ -552,10 +642,10 @@ int main(int argc, char **argv) {
 		if (toggledebug()) debug = !debug;
 
         // If [HOME] was pressed on the first Wiimote, break out of the loop
-        if (((homedown()) && ((gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_CONTROLS) | (gamestate == GAMESTATES_CREDITS))) ||
+        if (((homedown() || gcstartdown()) && ((gamestate == GAMESTATES_MENU) | (gamestate == GAMESTATES_CONTROLS) | (gamestate == GAMESTATES_CREDITS))) ||
 		(adown() && quit_button) ||
-		((onedown() || classicadown()) && (selected_button == SELECT_QUIT))) break;
-		if ((homedown()) && (gamestate == GAMESTATES_GAME)) {
+		((onedown() || classicadown() || gcadown()) && (selected_button == SELECT_QUIT))) break;
+		if ((homedown() || gcstartdown()) && (gamestate == GAMESTATES_GAME)) {
 			selected_button = SELECT_PLAY;
 			gamestate = GAMESTATES_MENU;
 		}
@@ -566,18 +656,18 @@ int main(int argc, char **argv) {
     //GRRLIB_FreeTexture(font);
     //GRRLIB_FreeTexture(font2);
     //GRRLIB_FreeTTF(font3);
-    GRRLIB_FreeTexture(tex_BMfont5);
-	GRRLIB_FreeTexture(menu);
-	GRRLIB_FreeTexture(controls);
-	GRRLIB_FreeTexture(credits);
-	GRRLIB_FreeTexture(wiimote_controls);
-	GRRLIB_FreeTexture(nunchuck_controls);
-	GRRLIB_FreeTexture(classic_controller_controls);
-	GRRLIB_FreeTexture(maze);
-	GRRLIB_FreeTexture(win);
-	GRRLIB_FreeTexture(lose);
+    // GRRLIB_FreeTexture(tex_BMfont5);
+	// GRRLIB_FreeTexture(menu);
+	// GRRLIB_FreeTexture(controls);
+	// GRRLIB_FreeTexture(credits);
+	// GRRLIB_FreeTexture(wiimote_controls);
+	// GRRLIB_FreeTexture(nunchuck_controls);
+	// GRRLIB_FreeTexture(classic_controller_controls);
+	// GRRLIB_FreeTexture(maze);
+	// GRRLIB_FreeTexture(win);
+	// GRRLIB_FreeTexture(lose);
     GRRLIB_Exit(); // Be a good boy, clear the memory allocated by GRRLIB
-
 	StopOgg();
+
     exit(0);  // Use exit() to exit a program, do not use 'return' from main()
 }
