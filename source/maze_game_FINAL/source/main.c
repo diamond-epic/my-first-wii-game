@@ -377,7 +377,7 @@ int main(int argc, char **argv) {
 			((control_menu == CONTROLS_GAMECUBE_CONTROLLER) ? gamecube_controller_controls : wiimote_controls)))),
 			0,1,1,GRRLIB_WHITE);
 			if (selected_button == SELECT_WIIMOTE) {
-				if (classicleftdown() || gcleftdown() || leftdown() || updown()) selected_button = SELECT_CLASSIC_CONTROLLER;
+				if (classicleftdown() || gcleftdown() || leftdown() || updown()) selected_button = SELECT_GAMECUBE_CONTROLLER;
 				if (classicrightdown() || gcrightdown() || rightdown() || downdown()) selected_button = SELECT_NUNCHUCK;
 				GRRLIB_Rectangle(5, 413, 154, 63, GRRLIB_CYAN_TRANSLUCENT, true);
 			}
